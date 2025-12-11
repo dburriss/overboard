@@ -1,0 +1,102 @@
+name: Copilot Setup Steps for Multi-Version .NET
+
+# This workflow sets up a multi-version .NET environment for GitHub Copilot
+# It configures .NET 6, 8, and 10 SDKs for comprehensive project support
+# Docs: https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/customize-the-agent-environment
+
+on:
+  # Allow manual triggering from the Actions tab
+  workflow_dispatch:
+  
+  # Automatically run when this workflow file is modified
+  push:
+    paths:
+      - '.github/workflows/copilot-setup-steps.yml'
+  
+  pull_request:
+    paths:
+      - '.github/workflows/copilot-setup-steps.yml'
+
+# Security: Use minimal required permissions following principle of least privilege
+permissions:
+  contents: read
+
+jobs:
+  # Job name MUST be 'copilot-setup-steps' to be recognized by GitHub Copilot
+  copilot-setup-steps:
+    name: Setup Multi-Version .NET Environment
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Checkout repository with full history for accurate git operations
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for complete git information
+      
+      # Step 2: Setup multiple .NET SDK versions in a single step
+      # Using specific version numbers for reproducibility (not wildcards)
+      # Multi-version syntax allows multiple SDKs to coexist
+      - name: Setup .NET SDK (Multi-Version)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.0.428
+            8.0.416
+            10.0.101
+          # Cache NuGet packages to improve performance
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+      
+      # Step 3: Configure NuGet package caching for performance optimization
+      # This step caches packages based on lock files to speed up dependency restoration
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          # Cache key includes OS and hash of lock files for accurate invalidation
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json', '**/*.fsproj', '**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+      
+      # Step 4: Restore project dependencies
+      # This ensures all required packages are available before build
+      - name: Restore dependencies
+        run: dotnet restore
+      
+      # Step 5: Install dotnet-format tool globally
+      # Used for code formatting and style enforcement
+      - name: Install dotnet-format
+        run: dotnet tool install -g dotnet-format
+      
+      # Step 6: Configure .NET environment variables
+      # These settings optimize the .NET experience in CI/CD environments
+      - name: Set .NET environment variables
+        run: |
+          echo "DOTNET_ROOT=$HOME/.dotnet" >> $GITHUB_ENV
+          echo "DOTNET_CLI_TELEMETRY_OPTOUT=1" >> $GITHUB_ENV
+          echo "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1" >> $GITHUB_ENV
+          echo "DOTNET_NOLOGO=1" >> $GITHUB_ENV
+      
+      # Step 7: Verify .NET SDK installations
+      # Lists all installed SDK versions to confirm proper setup
+      - name: Verify .NET installations
+        run: dotnet --list-sdks
+      
+      # Step 8: Build validation to ensure setup works correctly
+      # Builds the project to verify all SDKs and dependencies are properly configured
+      - name: Build validation
+        run: dotnet build --configuration Release --no-restore
+      
+      # Step 9: Display environment information for debugging
+      # Provides comprehensive information about the build environment
+      - name: Display environment information
+        run: |
+          echo "=== .NET SDK Versions ==="
+          dotnet --version
+          echo ""
+          echo "=== .NET Runtime Versions ==="
+          dotnet --list-runtimes
+          echo ""
+          echo "=== Environment Variables ==="
+          env | grep DOTNET | sort
