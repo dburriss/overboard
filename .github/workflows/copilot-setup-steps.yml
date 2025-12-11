@@ -1,0 +1,85 @@
+name: Copilot Setup Steps for Multi-Version .NET
+
+# This workflow sets up the .NET environment for GitHub Copilot
+# It configures multiple .NET SDK versions and installs necessary tools
+# Documentation: https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/customize-the-agent-environment
+
+on:
+  # Allow manual triggering from the Actions tab
+  workflow_dispatch:
+  # Run on changes to this workflow file to validate setup
+  push:
+    paths:
+      - '.github/workflows/copilot-setup-steps.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/copilot-setup-steps.yml'
+
+# Security: Use minimum required permissions
+# Only read access to repository contents is needed
+permissions:
+  contents: read
+
+jobs:
+  # Job name must be 'copilot-setup-steps' for GitHub Copilot recognition
+  copilot-setup-steps:
+    name: Setup Multi-Version .NET Environment
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Checkout with full history for accurate build context
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # Setup multiple .NET SDK versions in a single step
+      # Using specific versions for reproducibility and reliability
+      # Includes NuGet package caching with lock files for performance
+      - name: Setup .NET SDK (Multi-Version)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.0.428
+            8.0.416
+            10.0.101
+          # Enable NuGet package caching for faster restores
+          cache: true
+          # Use packages.lock.json files for cache key generation
+          cache-dependency-path: '**/packages.lock.json'
+      
+      # Configure .NET environment variables for optimal performance
+      # DOTNET_ROOT: Specifies .NET installation directory
+      # DOTNET_CLI_TELEMETRY_OPTOUT: Disables telemetry for CI/CD privacy
+      - name: Set .NET environment variables
+        run: |
+          echo "DOTNET_ROOT=$HOME/.dotnet" >> $GITHUB_ENV
+          echo "DOTNET_CLI_TELEMETRY_OPTOUT=1" >> $GITHUB_ENV
+          echo "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1" >> $GITHUB_ENV
+      
+      # Restore dependencies using locked mode for deterministic builds
+      # --locked-mode ensures exact package versions from lock files are used
+      - name: Restore dependencies
+        run: dotnet restore --locked-mode
+      
+      # Install dotnet-format tool for code formatting support
+      # This enables consistent code style enforcement
+      - name: Install dotnet-format
+        run: dotnet tool install -g dotnet-format
+      
+      # Validate the setup by building the solution
+      # This ensures all SDKs and dependencies are correctly configured
+      - name: Build solution
+        run: dotnet build --no-restore --configuration Release
+      
+      # Display installed .NET versions for verification
+      - name: Verify .NET installation
+        run: |
+          echo "=== Installed .NET SDKs ==="
+          dotnet --list-sdks
+          echo ""
+          echo "=== Installed .NET Runtimes ==="
+          dotnet --list-runtimes
+          echo ""
+          echo "=== dotnet-format version ==="
+          dotnet format --version
